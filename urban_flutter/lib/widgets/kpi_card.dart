@@ -4,19 +4,13 @@ class KpiCard extends StatelessWidget {
   final String title;
   final IconData icon;
   final Color color;
-  final VoidCallback onTap; // Tap function add kiya
+  final VoidCallback onTap;
 
-  const KpiCard({
-    super.key,
-    required this.title,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
+  const KpiCard({super.key, required this.title, required this.icon, required this.color, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell( // Isse click response aayega
+    return InkWell(
       onTap: onTap,
       child: Card(
         elevation: 4,
@@ -24,9 +18,9 @@ class KpiCard extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 45, color: color),
+            Icon(icon, size: 40, color: color),
             const SizedBox(height: 10),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
           ],
         ),
       ),

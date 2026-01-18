@@ -1,64 +1,208 @@
 import 'package:flutter/material.dart';
 import '../../widgets/kpi_card.dart';
-import '../chat_bot_screen.dart'; // AI Bot ke liye
-import '../complaints/war_room_screen.dart'; // Complaints ke liye
+import '../citizen/certificate_screen.dart';
+import '../citizen/hall_booking_screen.dart';
+import '../disaster/disaster_control_screen.dart';
+import '../health/aqi_monitor_screen.dart';
+import '../property/property_tax_screen.dart';
+import '../traffic/traffic_cam_screen.dart';
+import '../traffic/parking_locator.dart';
+import '../complaints/war_room_screen.dart';
+import '../ChatBot/chat_bot_screen.dart';
+import '../traffic/traffic_prediction_screen.dart';
+import '../revenue/budget_tracker_screen.dart';
+// ✅ Naye Imports
+import '../disaster/sos_feed_screen.dart';
+import '../complaints/heatmap_screen.dart';
+import '../admin/staff_monitor_screen.dart';
+import '../traffic/bus_tracker_screen.dart';
+import '../utilities/smart_grid_screen.dart';
+import '../safety/crime_analytics_screen.dart';
+import '../safety/patrol_tracker_screen.dart';
+import '../health/blood_bank_screen.dart';
+import '../complaints/complaints_main.dart';
 
-class AdminWarRoom extends StatelessWidget {
+// ... Saare imports wahi rahenge jo aapne diye hain ...
+
+class AdminWarRoom extends StatefulWidget {
   const AdminWarRoom({super.key});
+  @override
+  State<AdminWarRoom> createState() => _AdminWarRoomState();
+}
+
+class _AdminWarRoomState extends State<AdminWarRoom> {
+  String selectedCategory = "All";
+  String searchQuery = "";
+
+  // ✅ Category list updated with 'Safety' and 'Admin'
+  final List<String> categories = ["All", "Complaints", "Disaster", "Property", "Traffic", "Health", "Citizen", "Safety", "Admin"];
+
+  final List<Map<String, dynamic>> allFeatures = [
+    // --- COMPLAINTS (Simplified to one Hub) ---
+    {
+      "title": "Complaints Hub",
+      "cat": "Complaints",
+      "icon": Icons.campaign,
+      "color": Colors.red,
+      "page": const ComplaintsMain() // ✅ Gatekeeper logic iske andar hai
+    },
+    {"title": "Grievance Map", "cat": "Complaints", "icon": Icons.map, "color": Colors.redAccent, "page": const ComplaintsHeatmap()},
+    {"title": "Resolution Stats", "cat": "Complaints", "icon": Icons.bar_chart, "color": Colors.red, "page": null},
+
+    // --- DISASTER ---
+    {"title": "SOS Center", "cat": "Disaster", "icon": Icons.emergency_share, "color": Colors.red, "page": const SOSFeedScreen()},
+    {"title": "Flood Alert", "cat": "Disaster", "icon": Icons.flood, "color": Colors.blue, "page": const DisasterControlScreen()},
+
+    // --- PROPERTY & REVENUE ---
+    {"title": "Budget Tracker", "cat": "Property", "icon": Icons.account_balance_wallet, "color": Colors.blueGrey, "page": const BudgetTrackerScreen()},
+    {"title": "Property Tax", "cat": "Property", "icon": Icons.payments, "color": Colors.green, "page": const PropertyTaxScreen()},
+
+    // --- TRAFFIC & TRANSPORT ---
+    {"title": "Traffic Cam Live", "cat": "Traffic", "icon": Icons.videocam, "color": Colors.indigo, "page": const TrafficCamScreen()},
+    {"title": "Smart Parking", "cat": "Traffic", "icon": Icons.local_parking, "color": Colors.indigoAccent, "page": const SmartParkingScreen()},
+    {"title": "Bus Tracker", "cat": "Traffic", "icon": Icons.directions_bus, "color": Colors.blueGrey, "page": const BusTrackerScreen()},
+    {"title": "AI Traffic Forecast", "cat": "Traffic", "icon": Icons.auto_graph, "color": Colors.deepPurple, "page": const TrafficPredictionScreen()},
+
+    // --- HEALTH & SAFETY ---
+    {"title": "AQI Monitor", "cat": "Health", "icon": Icons.air, "color": Colors.teal, "page": const AqiMonitorScreen()},
+    {"title": "Blood Bank", "cat": "Health", "icon": Icons.bloodtype, "color": Colors.red, "page": const BloodBankScreen()},
+    {"title": "Crime Analytics", "cat": "Safety", "icon": Icons.security, "color": Colors.redAccent, "page": const CrimeAnalyticsScreen()},
+    {"title": "Patrol Track", "cat": "Safety", "icon": Icons.nightlight_round, "color": Colors.indigo, "page": const PatrolTrackerScreen()},
+
+    // --- CITIZEN SERVICES ---
+    {"title": "Certificates", "cat": "Citizen", "icon": Icons.assignment, "color": Colors.amber, "page": const CertificateScreen()},
+    {"title": "Hall Booking", "cat": "Citizen", "icon": Icons.home_work, "color": Colors.deepOrange, "page": const HallBookingScreen()},
+
+    // --- ADMIN & AI ---
+    {"title": "CityBrain AI", "cat": "All", "icon": Icons.psychology, "color": Colors.deepPurple, "page": const CityBrainBot()},
+    {"title": "Staff Monitor", "cat": "Admin", "icon": Icons.groups, "color": Colors.indigo, "page": const StaffMonitorScreen()},
+    {"title": "Energy Grid", "cat": "All", "icon": Icons.bolt, "color": Colors.yellow[800], "page": const SmartGridScreen()},
+  ];
 
   @override
   Widget build(BuildContext context) {
+    final filtered = allFeatures.where((f) {
+      bool matchesCat = selectedCategory == "All" || f['cat'] == selectedCategory;
+      bool matchesSearch = f['title'].toLowerCase().contains(searchQuery.toLowerCase());
+      return matchesCat && matchesSearch;
+    }).toList();
+
     return Scaffold(
-      appBar: AppBar(title: const Text("URBAN COMMAND CENTER")),
+      appBar: AppBar(
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.account_circle, size: 30),
+              onPressed: () {
+                // Seedha Login/Role Selection par bhejega
+                Navigator.push(context, MaterialPageRoute(builder: (c) => const ComplaintsMain()));
+              },
+            ),
+          ],
+          title: const Text("URBAN OS COMMAND CENTER"),
+          centerTitle: true
+      ),
       body: Column(
         children: [
-          _buildSearchBar(),
+          _buildSOSAlert(),
+          _buildSearchAndFilters(),
           Expanded(
-            child: GridView.count(
-              crossAxisCount: 2,
-              padding: const EdgeInsets.all(15),
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-              children: [
-                // 1. AI CityBrain Card
-                KpiCard(
-                  title: "AI CityBrain",
-                  icon: Icons.psychology,
-                  color: Colors.blue,
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) =>  CityBrainBot())),
-                ),
-                // 2. Complaints Card
-                KpiCard(
-                  title: "Complaints",
-                  icon: Icons.report,
-                  color: Colors.red,
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const ComplaintsWarRoom())),
-                ),
-                // 3. Property Dashboard (Placeholder)
-                KpiCard(
-                  title: "Property Tax",
-                  icon: Icons.money,
-                  color: Colors.green,
-                  onTap: () => print("Property Tapped"),
-                ),
-              ],
+            child: GridView.builder(
+              padding: const EdgeInsets.all(12),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 0.85, // Optimized for icons + text
+              ),
+              itemCount: filtered.length,
+              itemBuilder: (context, i) => KpiCard(
+                title: filtered[i]['title'],
+                icon: filtered[i]['icon'],
+                color: filtered[i]['color'],
+                onTap: () {
+                  if (filtered[i]['page'] != null) {
+                    Navigator.push(context, MaterialPageRoute(builder: (c) => filtered[i]['page']));
+                  } else {
+                    _showPlaceholder(context, filtered[i]['title']);
+                  }
+                },
+              ),
             ),
           ),
         ],
       ),
     );
   }
-
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.all(15.0),
-      child: TextField(
-        decoration: InputDecoration(
-          hintText: "Search 200+ features...",
-          prefixIcon: const Icon(Icons.search),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(30)),
-        ),
+  // 🚨 Emergency Alert UI
+  Widget _buildSOSAlert() {
+    return Container(
+      margin: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.red.shade900,
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.emergency_share, color: Colors.white, size: 30),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("LIVE SOS ALERT", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Text("Medical: Ward 15 | 2m ago", style: TextStyle(color: Colors.white70, fontSize: 12)),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const SOSFeedScreen())),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.red),
+            child: const Text("VIEW"),
+          )
+        ],
       ),
     );
+  }
+
+  Widget _buildSearchAndFilters() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          child: TextField(
+            onChanged: (v) => setState(() => searchQuery = v),
+            decoration: InputDecoration(
+              hintText: "Search 200+ Features...",
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(30)),
+              filled: true,
+              fillColor: Colors.grey.withOpacity(0.1),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 40,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: categories.length,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            itemBuilder: (ctx, i) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: ChoiceChip(
+                label: Text(categories[i]),
+                selected: selectedCategory == categories[i],
+                onSelected: (bool selected) => setState(() => selectedCategory = categories[i]),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showPlaceholder(BuildContext context, String title) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("$title: Module ready in next update!")));
   }
 }
