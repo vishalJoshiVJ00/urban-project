@@ -3,71 +3,68 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://10.0.2.2:3000/api/v1';
+  static const String baseUrl = 'http://10.0.2.2:3000/api/v1'; // Emulator ke liye
 
+  // 1️⃣ Send OTP
   static Future<bool> sendOtp(String contact) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/auth/send-otp'),
-        body: jsonEncode({'contact': contact}),
-        headers: {'Content-Type': 'application/json'},
-      );
-      return response.statusCode == 200;
-    } catch (e) {
-      return false;
-    }
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/send-otp'),
+      body: jsonEncode({'contact': contact}),
+      headers: {'Content-Type': 'application/json'},
+    );
+    return response.statusCode == 200;
   }
 
-  // 2️⃣ OTP Verify & Profile Data Save Karna
-  static Future<bool> verifyOtp(String contact, String otp) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/auth/verify-otp'),
-        body: jsonEncode({'contact': contact, 'otp': otp}),
-        headers: {'Content-Type': 'application/json'},
-      );
+  // 2️⃣ Verify OTP & Save Token
+  static Future<String?> verifyOtp(String contact, String otp) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/verify-otp'),
+      body: jsonEncode({'contact': contact, 'otp': otp}),
+      headers: {'Content-Type': 'application/json'},
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      SharedPreferences prefs = await SharedPreferences.getInstance();
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        SharedPreferences prefs = await SharedPreferences.getInstance();
+      // Token aur Login status save karna zaroori hai
+      await prefs.setString('token', data['token']);
+      await prefs.setBool('isLoggedIn', true);
 
-        // Asli Persistence Logic: Sab kuch ek jagah save
-        await prefs.setString('token', data['token']);
-        await prefs.setString('firstName', data['user']['firstName'] ?? "User");
+      // Deepanshu agar user details bhej raha hai toh wo bhi yahan save karein
+      if (data['user'] != null) {
+        await prefs.setString('firstName', data['user']['firstName'] ?? "");
         await prefs.setString('surname', data['user']['surname'] ?? "");
         await prefs.setString('contact', contact);
-        await prefs.setBool('isLoggedIn', true);
-        return true;
       }
-      return false;
-    } catch (e) {
-      return false;
+
+      return data['token'];
     }
+    return null;
   }
 
-  // 3️⃣ Complaint Create Karna (With Token)
-  static Future<bool> createComplaint(Map<String, dynamic> complaintData) async {
-    try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? token = prefs.getString('token');
+  // 3️⃣ Get Admin Feed (Deepanshu's Header Logic)
+  static Future<List<dynamic>> getAdminFeed() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? token = prefs.getString('token');
 
-      final response = await http.post(
-        Uri.parse('$baseUrl/complaints'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode(complaintData),
-      );
-      return response.statusCode == 201;
-    } catch (e) {
-      return false;
-    }
+    final response = await http.get(
+      Uri.parse('$baseUrl/complaints/admin'),
+      headers: {
+        'Authorization': 'Bearer $token', // Header authentication
+      },
+    );
+    return response.statusCode == 200 ? jsonDecode(response.body) : [];
   }
 
-  // 4️⃣ Logout Logic (Clean up)
+  // 🚪 4️⃣ LOGOUT LOGIC (Error Fix for Line 67)
+  // Dashboard isi static function ko dhund raha tha
   static Future<void> logout() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    // Logic: Memory se saara login data saaf kar do
     await prefs.clear();
+
+    // Debugging ke liye:
+    print("User session cleared successfully.");
   }
 }
