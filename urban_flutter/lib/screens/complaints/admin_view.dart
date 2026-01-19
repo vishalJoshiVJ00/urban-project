@@ -1,43 +1,89 @@
 import 'package:flutter/material.dart';
-import '../../core/api_service.dart'; // ✅ API Service import zaroori hai
+import 'dart:convert'; // ✅ Base64 photo dikhane ke liye
+import '../../core/api_service.dart';
 
-class AdminView extends StatelessWidget {
+class AdminView extends StatefulWidget {
   const AdminView({super.key});
+  @override
+  State<AdminView> createState() => _AdminViewState();
+}
+
+class _AdminViewState extends State<AdminView> {
+  // ✅ 1. Status Update karne ka function
+  void _updateStatus(String id, String newStatus) async {
+    bool ok = await ApiService.updateStatus(id, newStatus);
+    if (ok) {
+      setState(() {}); // Screen refresh karein
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Status Updated!")));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Admin War Room (Live Feed)"),
-        backgroundColor: Colors.red,
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: () => (context as Element).markNeedsBuild()),
-        ],
-      ),
-      // ✅ Deepanshu ki API se live data fetch karne ka logic
+      appBar: AppBar(title: const Text("Admin War Room (Feed)"), backgroundColor: Colors.red.shade900),
       body: FutureBuilder<List<dynamic>>(
-        future: ApiService.getAdminFeed(), // ✅ GET http://localhost:3000/api/v1/complaints/admin
+        future: ApiService.getAdminFeed(), // ✅ Deepanshu ki sorted feed API
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text("Bhai, abhi koi complaints nahi hain."));
-          }
+          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+          if (!snapshot.hasData || snapshot.data!.isEmpty) return const Center(child: Text("Koi complaints nahi hain!"));
 
-          final complaints = snapshot.data!;
           return ListView.builder(
-            padding: const EdgeInsets.all(15),
-            itemCount: complaints.length,
+            itemCount: snapshot.data!.length,
             itemBuilder: (context, index) {
-              final item = complaints[index];
-              return _buildComplaintCard(
-                  context,
-                  item['title'] ?? "No Title",
-                  item['location'] ?? "Unknown",
-                  item['citizenName'] ?? "Anonymous",
-                  item['email'] ?? "N/A",
-                  item['complaintCount'] ?? 0 // ✅ Red border ke liye count
+              var item = snapshot.data![index];
+              int priority = item['priorityScore'] ?? 0;
+
+              // ✅ 2. Priority Logic: Score 9-10 par Red Border
+              bool isUrgent = priority >= 9;
+
+              return Container(
+                margin: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  border: isUrgent ? Border.all(color: Colors.red, width: 3) : null,
+                  borderRadius: BorderRadius.circular(10),
+                  color: Colors.white,
+                  boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.5), blurRadius: 5)],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ✅ 3. Base64 Image Display
+                    item['image'] != null
+                        ? Image.memory(base64Decode(item['image']), height: 200, width: double.infinity, fit: BoxFit.cover)
+                        : Container(height: 100, color: Colors.grey, child: const Center(child: Text("No Image"))),
+
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(item['category'].toString().toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                              Chip(label: Text("Priority: $priority"), backgroundColor: isUrgent ? Colors.red : Colors.orange),
+                            ],
+                          ),
+                          const SizedBox(height: 5),
+                          Text(item['description'] ?? "No description"),
+                          const Divider(),
+                          const Text("Update Status:", style: TextStyle(fontWeight: FontWeight.bold)),
+
+                          // ✅ 4. Status Buttons (Deepanshu ne valid status "working", "solved", "fake" maange hain)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              ElevatedButton(onPressed: () => _updateStatus(item['id'], "working"), style: ElevatedButton.styleFrom(backgroundColor: Colors.orange), child: const Text("WORKING")),
+                              ElevatedButton(onPressed: () => _updateStatus(item['id'], "solved"), style: ElevatedButton.styleFrom(backgroundColor: Colors.green), child: const Text("SOLVED")),
+                              ElevatedButton(onPressed: () => _updateStatus(item['id'], "fake"), style: ElevatedButton.styleFrom(backgroundColor: Colors.grey), child: const Text("FAKE")),
+                            ],
+                          )
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               );
             },
           );
@@ -45,98 +91,4 @@ class AdminView extends StatelessWidget {
       ),
     );
   }
-
-  Widget _buildComplaintCard(BuildContext context, String title, String loc, String name, String email, int count) {
-    // 🔴 Deepanshu ka logic: Agar count 5 ya zyada hai toh Red Border
-    bool isUrgent = count >= 5;
-
-    return Card(
-      elevation: 5,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        // ✅ "Red Border" Logic Implementation
-        side: BorderSide(
-            color: isUrgent ? Colors.red : Colors.transparent,
-            width: 2.5
-        ),
-      ),
-      child: ListTile(
-        leading: CircleAvatar(
-            backgroundColor: isUrgent ? Colors.red : Colors.orange,
-            child: Text("$count", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
-        ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text("By: $name | Loc: $loc"),
-        trailing: const Icon(Icons.open_in_new),
-        onTap: () => _showFullDetails(context, title, name, loc, email),
-      ),
-    );
-  }
-
-  // ... _showFullDetails, _infoRow, aur _evidenceIcon wahi rahenge jo aapne diye hain ...
-  // Bas Resolve/Fake buttons mein Navigator.pop ke baad API call add ki ja sakti hai
-
-  void _showFullDetails(BuildContext context, String title, String name, String loc, String email) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-      builder: (c) => Container(
-        padding: const EdgeInsets.all(25),
-        height: MediaQuery.of(context).size.height * 0.75,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("COMPLAINT FILE: $title", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.red)),
-            const Divider(),
-            _infoRow(Icons.person, "Citizen:", name),
-            _infoRow(Icons.email, "Contact:", email),
-            _infoRow(Icons.location_on, "Location:", loc),
-            const SizedBox(height: 20),
-            const Text("Attachments:", style: TextStyle(fontWeight: FontWeight.bold)),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _evidenceIcon(Icons.image, "Photo", Colors.blue),
-                _evidenceIcon(Icons.mic, "Voice", Colors.green),
-                _evidenceIcon(Icons.map, "GPS", Colors.orange),
-              ],
-            ),
-            const Spacer(),
-            Row(
-              children: [
-                Expanded(child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _statusMsg(context, "Complaint Resolved! ✅");
-                    },
-                    child: const Text("RESOLVE", style: TextStyle(color: Colors.white))
-                )),
-                const SizedBox(width: 10),
-                Expanded(child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _statusMsg(context, "Marked as Fake/Invalid. ⚠️");
-                    },
-                    child: const Text("MARK FAKE")
-                )),
-              ],
-            )
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _infoRow(IconData i, String label, String val) => ListTile(
-    leading: Icon(i, color: Colors.blue),
-    title: Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-    subtitle: Text(val, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-  );
-
-  Widget _evidenceIcon(IconData i, String t, Color c) => Column(children: [Icon(i, color: c, size: 40), Text(t)]);
-
-  void _statusMsg(BuildContext context, String m) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
 }

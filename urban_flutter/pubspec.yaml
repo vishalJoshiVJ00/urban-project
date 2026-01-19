@@ -33,11 +33,14 @@ dependencies:
   http: ^1.2.0
   provider: ^6.1.1
   shared_preferences: ^2.2.2  # Persistent login ke liye
-  geolocator: ^10.1.0        # Location fix
-  image_picker: ^1.0.7      # Camera fix
+  geolocator: ^14.0.2        # Location fix
+  image_picker: ^1.2.1      # Camera fix
   permission_handler: ^11.3.1 # Permission popup ke liye
   flutter_sound: ^9.2.13    # Mic fix
   path_provider: ^2.1.2
+  speech_to_text: ^7.3.0
+
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

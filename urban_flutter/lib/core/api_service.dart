@@ -3,68 +3,145 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://10.0.2.2:3000/api/v1'; // Emulator ke liye
+  // ✅ Deepanshu ke phone/laptop ka IP yahan set hai
+  static const String baseUrl = 'http://192.168.1.4:3000/api/v1';
 
-  // 1️⃣ Send OTP
-  static Future<bool> sendOtp(String contact) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/auth/send-otp'),
-      body: jsonEncode({'contact': contact}),
+  // 1️⃣ Email Check
+  static Future<bool> checkEmail(String email) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/auth/check-email'), // ✅ Localhost hata kar $baseUrl kar diya
+      body: jsonEncode({'email': email}),
       headers: {'Content-Type': 'application/json'},
     );
-    return response.statusCode == 200;
-  }
-
-  // 2️⃣ Verify OTP & Save Token
-  static Future<String?> verifyOtp(String contact, String otp) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/auth/verify-otp'),
-      body: jsonEncode({'contact': contact, 'otp': otp}),
-      headers: {'Content-Type': 'application/json'},
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-
-      // Token aur Login status save karna zaroori hai
-      await prefs.setString('token', data['token']);
-      await prefs.setBool('isLoggedIn', true);
-
-      // Deepanshu agar user details bhej raha hai toh wo bhi yahan save karein
-      if (data['user'] != null) {
-        await prefs.setString('firstName', data['user']['firstName'] ?? "");
-        await prefs.setString('surname', data['user']['surname'] ?? "");
-        await prefs.setString('contact', contact);
-      }
-
-      return data['token'];
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body)['exists'] ?? false;
     }
-    return null;
+    return false;
   }
 
-  // 3️⃣ Get Admin Feed (Deepanshu's Header Logic)
-  static Future<List<dynamic>> getAdminFeed() async {
+  // 2️⃣ OTP Flow
+  static Future<bool> sendOtp(String email) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/auth/send-otp'), // ✅ $baseUrl fixed
+      body: jsonEncode({'email': email}),
+      headers: {'Content-Type': 'application/json'},
+    );
+    return res.statusCode == 200;
+  }
+
+  // 3️⃣ Verify OTP & Login (Named Parameters)
+  static Future<bool> verifyAndLogin({
+    required String email,
+    required String otp,
+    String? name,
+    String? dob,
+    String? password,
+  }) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/auth/verify-otp'), // ✅ $baseUrl fixed
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': email,
+        'otp': otp,
+        'name': name,
+        'dob': dob,
+        'password': password,
+      }),
+    );
+
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString('token', data['token']);
+      await prefs.setString('email', data['user']['email']);
+      await prefs.setString('name', data['user']['name']);
+      await prefs.setString('role', data['user']['role']);
+      await prefs.setBool('isLoggedIn', true);
+      return true;
+    }
+    return false;
+  }
+
+  // 4️⃣ Reset Password
+  static Future<bool> resetPassword(String email, String otp, String newPass) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/auth/reset-password'), // ✅ Fixed
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': email,
+        'otp': otp,
+        'newPassword': newPass,
+      }),
+    );
+    return res.statusCode == 200;
+  }
+
+  // 5️⃣ Complaint Submission
+  static Future<bool> submitComplaint(Map<String, dynamic> data) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('token');
 
-    final response = await http.get(
-      Uri.parse('$baseUrl/complaints/admin'),
+    final res = await http.post(
+      Uri.parse('$baseUrl/complaints'), // ✅ Fixed
       headers: {
-        'Authorization': 'Bearer $token', // Header authentication
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
       },
+      body: jsonEncode(data),
     );
-    return response.statusCode == 200 ? jsonDecode(response.body) : [];
+    return res.statusCode == 201 || res.statusCode == 200;
   }
 
-  // 🚪 4️⃣ LOGOUT LOGIC (Error Fix for Line 67)
-  // Dashboard isi static function ko dhund raha tha
+  // 6️⃣ Get My Complaints
+  static Future<List<dynamic>> getMyComplaints() async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('token');
+
+      final res = await http.get(
+        Uri.parse('$baseUrl/complaints/my'), // ✅ Fixed
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return res.statusCode == 200 ? jsonDecode(res.body) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // 7️⃣ Admin Feed
+  static Future<List<dynamic>> getAdminFeed() async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('token');
+
+      final res = await http.get(
+        Uri.parse('$baseUrl/complaints/admin'), // ✅ Fixed
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return res.statusCode == 200 ? jsonDecode(res.body) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // 8️⃣ Admin Status Update
+  static Future<bool> updateStatus(String id, String status) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? token = prefs.getString('token');
+
+    final res = await http.patch(
+      Uri.parse('$baseUrl/complaints/$id'), // ✅ Fixed
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'status': status}),
+    );
+    return res.statusCode == 200;
+  }
+
   static Future<void> logout() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-
-    // Logic: Memory se saara login data saaf kar do
     await prefs.clear();
-
-    // Debugging ke liye:
-    print("User session cleared successfully.");
   }
 }

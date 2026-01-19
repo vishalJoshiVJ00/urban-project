@@ -1,27 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:permission_handler/permission_handler.dart'; // ✅ Permissions ke liye
+import 'package:shared_preferences/shared_preferences.dart'; // ✅ Storage ke liye
 
 // --- Core Imports ---
 import 'core/app_provider.dart';
-import 'core/voice_service.dart'; // ✅ Make sure this file exists
 
-// --- Dashboard Import ---
-import 'screens/dashboard/admin_war_room.dart';
+// --- Screen Imports ---
+import 'screens/dashboard/admin_war_room.dart'; // ✅ Dashboard/Home
+import 'screens/complaints/citizen_auth.dart';
 
-void main() {
+void main() async {
+  // ✅ Compulsory for async initialization
   WidgetsFlutterBinding.ensureInitialized();
+  // ✅ App start hote hi Permissions maangega (Storage, Camera, Location)
+  await _requestInitialPermissions();
 
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => AppProvider()),
-        // ✅ Agar VoiceService error de raha hai toh check karein ki
-        // class 'ChangeNotifier' ko extend kar rahi hai ya nahi.
-        // ChangeNotifierProvider(create: (_) => VoiceService()),
-      ],
-      child: const UrbanApp(),
-    ),
+  MultiProvider(
+    providers: [
+      ChangeNotifierProvider(create: (_) => AppProvider()),
+    ],
+    child: const UrbanApp(),
+  ),
   );
+}
+
+// 🛠️ 1. Global Permission Handler
+Future<void> _requestInitialPermissions() async {
+  await [
+    Permission.location,
+    Permission.camera,
+    Permission.microphone,
+    Permission.storage,
+  ].request();
 }
 
 class UrbanApp extends StatelessWidget {
@@ -29,7 +41,6 @@ class UrbanApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Provider se current theme uthana
     final appState = Provider.of<AppProvider>(context);
 
     return MaterialApp(
@@ -43,6 +54,7 @@ class UrbanApp extends StatelessWidget {
           : ThemeData.light().copyWith(
         primaryColor: Colors.blue,
       ),
+      // ✅ Ab app seedha Dashboard par khulegi, login screen par nahi
       home: const AdminWarRoom(),
     );
   }
