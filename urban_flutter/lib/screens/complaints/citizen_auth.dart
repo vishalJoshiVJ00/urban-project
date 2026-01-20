@@ -8,10 +8,9 @@ class CitizenAuth extends StatefulWidget {
 }
 
 class _CitizenAuthState extends State<CitizenAuth> {
-  // 1: Role, 2: Login, 3: Forgot, 4: OTP, 5: NewPass, 6: Signup
   int step = 1;
   String role = "Citizen";
-  bool isSignupFlow = false; // ✅ Track karne ke liye ki login hai ya signup
+  bool isSignupFlow = false;
 
   final emailCont = TextEditingController();
   final passCont = TextEditingController();
@@ -31,32 +30,50 @@ class _CitizenAuthState extends State<CitizenAuth> {
     }
   }
 
-  bool _isPasswordStrong(String p) {
-    bool hasCapital = p.contains(RegExp(r'[A-Z]'));
-    bool hasSpecial = p.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
-    return p.length >= 6 && hasCapital && hasSpecial;
-  }
-
   void _logicCheck() async {
+    print("--- Logic Check Started ---");
+    print("Current Step: $step");
+
     if (step == 2) { // Login Flow
+      print("Attempting Login Check for: ${emailCont.text}");
       bool exists = await ApiService.checkEmail(emailCont.text);
       if (exists) {
-        await ApiService.sendOtp(emailCont.text);
-        setState(() { isSignupFlow = false; step = 4; });
+        print("User exists, sending OTP...");
+        bool otpSent = await ApiService.sendOtp(emailCont.text);
+        if (otpSent) {
+          print("OTP sent successfully to: ${emailCont.text}");
+          setState(() { isSignupFlow = false; step = 4; });
+        } else {
+          print("Failed to send OTP");
+          _msg("Error: OTP send nahi ho paya, please try again!");
+        }
       } else {
+        print("User does not exist in DB.");
         _msg("Error: Ye Gmail database mein nahi hai!");
       }
-    } else if (step == 6) { // Signup Flow
+    }
+    else if (step == 6) { // Signup Flow
+      print("Checking Signup Validations...");
       if (nameCont.text.isEmpty || dobCont.text.isEmpty || emailCont.text.isEmpty) {
+        print("Validation Failed: Empty fields");
         _msg("Bhai, Name, DOB aur Gmail bharna compulsory hai!");
         return;
       }
+
+      print("Checking if email already exists...");
       bool exists = await ApiService.checkEmail(emailCont.text);
       if (exists) {
+        print("Email already registered.");
         _msg("Error: Ye Gmail pehle se registered hai!");
       } else {
-        await ApiService.sendOtp(emailCont.text);
-        setState(() { isSignupFlow = true; step = 4; });
+        print("Email clear! Requesting OTP from Backend...");
+        bool otpSent = await ApiService.sendOtp(emailCont.text);
+        if (otpSent) {
+          print("OTP request function executed.");
+          setState(() { isSignupFlow = true; step = 4; });
+        } else {
+          _msg("Error: OTP send nahi ho paya, please try again!");
+        }
       }
     }
   }
@@ -70,7 +87,10 @@ class _CitizenAuthState extends State<CitizenAuth> {
         title: Text("$role Portal"),
         leading: step > 1 ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => setState(() => step = 1)) : null,
       ),
-      body: SingleChildScrollView(padding: const EdgeInsets.all(25), child: _buildUI()),
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(), // ✅ Tap karne par keyboard hide hoga
+        child: SingleChildScrollView(padding: const EdgeInsets.all(25), child: _buildUI()),
+      ),
     );
   }
 
@@ -102,19 +122,6 @@ class _CitizenAuthState extends State<CitizenAuth> {
     ]);
   }
 
-  Widget _forgotPassForm() {
-    return Column(children: [
-      const Text("Enter your registered Gmail to receive OTP"),
-      TextField(controller: emailCont, decoration: const InputDecoration(labelText: "Gmail")),
-      const SizedBox(height: 20),
-      _btn("SEND OTP", Colors.orange, () async {
-        bool exists = await ApiService.checkEmail(emailCont.text);
-        if (exists) { await ApiService.sendOtp(emailCont.text); setState(() { isSignupFlow = false; step = 4; }); }
-        else { _msg("Ye Email database mein nahi hai!"); }
-      }),
-    ]);
-  }
-
   Widget _signupForm() {
     return Column(children: [
       TextField(controller: nameCont, decoration: const InputDecoration(labelText: "Full Name *")),
@@ -137,7 +144,6 @@ class _CitizenAuthState extends State<CitizenAuth> {
       const SizedBox(height: 20),
       _btn("VERIFY", Colors.blue, () async {
         if (isSignupFlow) {
-          // ✅ Signup case: Sare data bhejo
           bool ok = await ApiService.verifyAndLogin(
             email: emailCont.text,
             otp: otpCont.text,
@@ -145,31 +151,157 @@ class _CitizenAuthState extends State<CitizenAuth> {
             dob: dobCont.text,
             password: passCont.text,
           );
-          if (ok) { _msg("Account Created!"); Navigator.pop(context); }
-          else { _msg("OTP galat hai!"); }
+          if (ok) {
+            _msg("Account Created Successfully!");
+            Navigator.pop(context);
+          } else {
+            _msg("OTP galat hai!");
+          }
         } else {
-          // ✅ Login/Forgot case: Step 5 par bhejo ya seedha login
-          setState(() => step = 5);
+          // ✅ FIXED: Login with OTP verification
+          bool ok = await ApiService.verifyAndLogin(
+            email: emailCont.text,
+            otp: otpCont.text,
+          );
+          if (ok) {
+            _msg("Login Successful!");
+            Navigator.pop(context);
+          } else {
+            _msg("OTP galat hai!");
+          }
         }
       }),
     ]);
   }
 
+  // ✅ FIXED: Complete Forgot Password UI
+  Widget _forgotPassForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Forgot Password",
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 20),
+        const Text("Enter your email to reset password"),
+        const SizedBox(height: 20),
+        TextField(
+          controller: emailCont,
+          decoration: const InputDecoration(
+            labelText: "Gmail",
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.email),
+          ),
+        ),
+        const SizedBox(height: 20),
+        _btn("SEND OTP", Colors.orange, () async {
+          print("Forgot Password OTP requested for: ${emailCont.text}");
+
+          // First check if email exists
+          bool exists = await ApiService.checkEmail(emailCont.text);
+          if (!exists) {
+            _msg("Error: This email is not registered!");
+            return;
+          }
+
+          // Send OTP for password reset
+          bool otpSent = await ApiService.forgotPassword(emailCont.text);
+          if (otpSent) {
+            _msg("OTP sent to your email for password reset!");
+            setState(() => step = 4); // Go to OTP screen
+          } else {
+            _msg("Failed to send OTP. Please try again.");
+          }
+        }),
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            onPressed: () => setState(() => step = 2), // Back to login
+            child: const Text("← Back to Login"),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ✅ FIXED: Complete New Password UI
   Widget _newPassScreen() {
-    return Column(children: [
-      const Text("Set Strong Password"),
-      TextField(controller: passCont, decoration: const InputDecoration(labelText: "New Password *"), obscureText: true),
-      const SizedBox(height: 20),
-      _btn("SAVE PASSWORD", Colors.green, () async {
-        if (_isPasswordStrong(passCont.text)) {
-          // ✅ Deepanshu ki API ke hisab se otp bhi bhejna hai
-          bool ok = await ApiService.resetPassword(emailCont.text, otpCont.text, passCont.text);
-          if (ok) { _msg("Password changed! Login karein."); setState(() => step = 2); }
-        } else {
-          _msg("Password weak hai!");
-        }
-      }),
-    ]);
+    final newPassCont = TextEditingController();
+    final confirmPassCont = TextEditingController();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Set New Password",
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 20),
+        TextField(
+          controller: otpCont,
+          decoration: const InputDecoration(
+            labelText: "Enter OTP",
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.lock),
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: newPassCont,
+          decoration: const InputDecoration(
+            labelText: "New Password",
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.lock_outline),
+          ),
+          obscureText: true,
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: confirmPassCont,
+          decoration: const InputDecoration(
+            labelText: "Confirm New Password",
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.lock_outline),
+          ),
+          obscureText: true,
+        ),
+        const SizedBox(height: 20),
+        _btn("RESET PASSWORD", Colors.purple, () async {
+          if (newPassCont.text != confirmPassCont.text) {
+            _msg("Passwords do not match!");
+            return;
+          }
+
+          if (newPassCont.text.length < 6) {
+            _msg("Password must be at least 6 characters!");
+            return;
+          }
+
+          bool success = await ApiService.resetPassword(
+            emailCont.text,
+            otpCont.text,
+            newPassCont.text,
+          );
+
+          if (success) {
+            _msg("Password reset successful! Please login with new password.");
+            setState(() => step = 2); // Go back to login
+          } else {
+            _msg("Failed to reset password. Please try again.");
+          }
+        }),
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            onPressed: () => setState(() => step = 4), // Back to OTP
+            child: const Text("← Back to OTP"),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _btn(String t, Color c, VoidCallback p) => ElevatedButton(

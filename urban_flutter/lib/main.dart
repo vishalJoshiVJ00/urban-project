@@ -17,12 +17,12 @@ void main() async {
   await _requestInitialPermissions();
 
   runApp(
-  MultiProvider(
-    providers: [
-      ChangeNotifierProvider(create: (_) => AppProvider()),
-    ],
-    child: const UrbanApp(),
-  ),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppProvider()),
+      ],
+      child: const UrbanApp(),
+    ),
   );
 }
 
@@ -54,8 +54,8 @@ class UrbanApp extends StatelessWidget {
           : ThemeData.light().copyWith(
         primaryColor: Colors.blue,
       ),
-      // ✅ Ab app seedha Dashboard par khulegi, login screen par nahi
-      home: const AdminWarRoom(),
+      // ✅ FIXED: Now opens login/signup screen for OTP
+      home: const CitizenAuth(), // ✅ Changed from AdminWarRoom
     );
   }
 }

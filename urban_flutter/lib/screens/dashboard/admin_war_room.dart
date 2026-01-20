@@ -37,9 +37,9 @@ class _AdminWarRoomState extends State<AdminWarRoom> {
   // ✅ LOGIC: Profile aur Logout ka popup
   void _showProfile(BuildContext context) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String name = prefs.getString('firstName') ?? "Guest";
-    String surname = prefs.getString('surname') ?? "User";
-    String phone = prefs.getString('contact') ?? "N/A";
+    String name = prefs.getString('name') ?? "Guest";
+    String email = prefs.getString('email') ?? "No Email";
+    String role = prefs.getString('role') ?? "User";
     bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
 
     showModalBottomSheet(
@@ -54,20 +54,41 @@ class _AdminWarRoomState extends State<AdminWarRoom> {
             const Divider(),
             ListTile(
               leading: const CircleAvatar(backgroundColor: Colors.blue, child: Icon(Icons.person, color: Colors.white)),
-              title: Text("$name $surname", style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(phone),
+              title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(email),
+                  const SizedBox(height: 5),
+                  Text("Role: $role"),
+                ],
+              ),
             ),
             const SizedBox(height: 20),
             if (isLoggedIn)
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red, minimumSize: const Size(double.infinity, 50)),
-                icon: const Icon(Icons.logout, color: Colors.white),
-                label: const Text("LOGOUT", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                onPressed: () async {
-                  await ApiService.logout();
-                  Navigator.pop(context);
-                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const AdminWarRoom()));
-                },
+              Column(
+                children: [
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, minimumSize: const Size(double.infinity, 50)),
+                    icon: const Icon(Icons.lock_reset, color: Colors.white),
+                    label: const Text("FORGOT PASSWORD", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(builder: (c) => const ForgotPasswordScreen()));
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red, minimumSize: const Size(double.infinity, 50)),
+                    icon: const Icon(Icons.logout, color: Colors.white),
+                    label: const Text("LOGOUT", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    onPressed: () async {
+                      await ApiService.logout();
+                      Navigator.pop(context);
+                      Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const AdminWarRoom()));
+                    },
+                  )
+                ],
               )
             else
               ElevatedButton(
@@ -222,5 +243,56 @@ class _AdminWarRoomState extends State<AdminWarRoom> {
 
   void _showPlaceholder(BuildContext context, String title) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("$title: Module ready in next update!")));
+  }
+}
+
+// ✅ Forgot Password Screen (Added)
+class ForgotPasswordScreen extends StatefulWidget {
+  const ForgotPasswordScreen({super.key});
+
+  @override
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+}
+
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  final TextEditingController _emailController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Forgot Password")),
+      body: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          children: [
+            const Text("Enter your email to reset password"),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _emailController,
+              decoration: const InputDecoration(
+                labelText: "Email",
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () async {
+                bool success = await ApiService.forgotPassword(_emailController.text);
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("OTP sent to your email!"))
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Failed to send OTP"))
+                  );
+                }
+              },
+              child: const Text("Send OTP"),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
